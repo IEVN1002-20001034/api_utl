@@ -1,123 +1,99 @@
-import pymysql
-from flask import Flask, request, jsonify
-from flask_mysqldb import MySQL
-
+from flask import Flask, jsonify, request
 from flask_cors import CORS
+from config import DevelopmentConfig
+from models import db, Pedido
+from datetime import datetime
 
-
-# from app.config import config
-from config import config
-
-app=Flask(__name__) 
+app = Flask(__name__)
 CORS(app)
+app.config.from_object(DevelopmentConfig)
 
-con=MySQL(app)
+#DECORADORES O RUTAS
+@app.route('/api', methods=['GET'])
+def get_data():
+    data = {"message": "Bienvenido a PIZZERIA API!"}
+    return data
 
-@app.route('/alumnos', methods=['GET'])
-def listar_alumnos():
-    try:
-        cursor = con.connection.cursor()
-        sql = "SELECT matricula, nombre, apaterno, amaterno, correo FROM alumnos ORDER BY nombre ASC"
-        cursor.execute(sql)
-        datos = cursor.fetchall()
-        alumnos = []
-        for fila in datos:
-            alumno = {'matricula': fila[0], 'nombre': fila[1], 'apaterno': fila[2],
-            'amaterno':fila[3],'correo':fila[4]}
-            alumnos.append(alumno)
-        return jsonify({'alumnos': alumnos, 'mensaje': "Alumnos listados.", 'exito': True})
-    except Exception as ex:
-        return jsonify({'mensaje': "Error: {}".format(ex), 'exito': False})
- 
- 
-def leer_alumno_bd(matricula):
-    try:
-        cursor = con.connection.cursor()
-        sql = "SELECT matricula, nombre, apaterno, amaterno, correo FROM alumnos WHERE matricula = {0}".format(matricula)
-        cursor.execute(sql)
-        datos = cursor.fetchone()
-        if datos != None:
-            alumno = {'matricula': datos[0], 'nombre': datos[1], 'apaterno': datos[2],'amaterno':datos[3],'correo':datos[4]}
-            return alumno
-        else:
-            return None
-    except Exception as ex:
-        raise ex
- 
- 
-@app.route('/alumnos/<mat>', methods=['GET'])
-def leer_curso(mat):
-    try:
-        alumno = leer_alumno_bd(mat)
-        if alumno != None:
-            return jsonify({'alumno': alumno, 'mensaje': "Alumno encontrado.", 'exito': True})
-        else:
-            return jsonify({'mensaje': "Alumno no encontrado.", 'exito': False})
-    except Exception as ex:
-        return jsonify({'mensaje': "Error", 'exito': False})
- 
- 
-@app.route('/alumnos', methods=['POST'])
-def registrar_alumno():
+@app.route('/api/addpedido', methods=['POST'])
+def add_pedido():
+    datos = request.get_json()
+    
+    print(datos)
+    if not datos:
+        return jsonify({"status": False, "error": "Se esperaba un array"}), 400
+
+    pedidos_ids = []
+    for pedido in datos['pedidos']:
         try:
-            alumno = leer_alumno_bd(request.json['matricula'])
-            if alumno != None:
-                return jsonify({'mensaje': "Alumno ya existe, no se puede duplicar.", 'exito': False})
-            else:
-                cursor = con.connection.cursor()
-                sql = """INSERT INTO alumnos (matricula, nombre, apaterno, amaterno, correo)
-                VALUES ('{0}', '{1}', '{2}','{3}','{4}')""".format(request.json['matricula'],
-                request.json['nombre'], request.json['apaterno'],request.json['amaterno'],request.json['correo'])
-                cursor.execute(sql)
-                con.connection.commit()  # Confirma la acción de inserción.
-                return jsonify({'mensaje': "Curso registrado.", 'exito': True})
-        except Exception as ex:
-            return jsonify({'mensaje': "Error" + ex, 'exito': False})
-    #else:
-     #   return jsonify({'mensaje': "Parámetros inválidos...", 'exito': False})
- 
- 
-@app.route('/alumnos/<mat>', methods=['PUT'])
-def actualizar_curso(mat):
-    #if (validar_matricula(mat) and validar_nombre(request.json['nombre']) and validar_apaterno(request.json['apaterno'])):
-        try:
-            alumno = leer_alumno_bd(mat)
-            if alumno != None:
-                cursor = con.connection.cursor()
-                sql = """UPDATE alumnos SET nombre = '{0}', apaterno = '{1}', amaterno='{2}', correo='{3}'
-                WHERE matricula = {4}""".format(request.json['nombre'], request.json['apaterno'], request.json['amaterno'],request.json['correo'], mat)
-                cursor.execute(sql)
-                con.connection.commit()  # Confirma la acción de actualización.
-                return jsonify({'mensaje': "Alumno actualizado.", 'exito': True})
-            else:
-                return jsonify({'mensaje': "Alumno no encontrado.", 'exito': False})
-        except Exception as ex:
-            return jsonify({'mensaje': "Error {0} ".format(ex), 'exito': False})
-    #else:
-     #   return jsonify({'mensaje': "Parámetros inválidos...", 'exito': False})
- 
- 
-@app.route('/alumnos/<mat>', methods=['DELETE'])
-def eliminar_curso(mat):
-    try:
-        alumno = leer_alumno_bd(mat)
-        if alumno != None:
-            cursor = con.connection.cursor()
-            sql = "DELETE FROM alumnos WHERE matricula = {0}".format(mat)
-            cursor.execute(sql)
-            con.connection.commit()  # Confirma la acción de eliminación.
-            return jsonify({'mensaje': "Alumno eliminado.", 'exito': True})
-        else:
-            return jsonify({'mensaje': "Alumno no encontrado.", 'exito': False})
-    except Exception as ex:
-        return jsonify({'mensaje': "Error", 'exito': False})
- 
- 
-def pagina_no_encontrada(error):
-    return "<h1>Página no encontrada</h1>", 404
- 
- 
+            nombre = pedido.get('nombre')
+            idpediddo = datos['id_compra']
+            telefono = pedido.get('telefono')
+            direccion = pedido.get('direccion')
+            fecha = pedido.get('fecha')
+            tamanio = pedido.get('tamanio')
+            cantidad = int(pedido.get('cantidad', 0))
+            champi = bool(pedido.get('champi'))
+            jamon = bool(pedido.get('jamon'))
+            pina = bool(pedido.get('pina'))
+            subtotal = float(pedido.get('subtotal', 0.0))
+
+            fecha = datetime.strptime(fecha, '%Y-%m-%d') if fecha else None
+
+            newPedido = Pedido(
+                nombre=nombre,
+                idpediddo= idpediddo,
+                telefono=telefono,
+                direccion=direccion,
+                fecha=fecha,
+                tamanio=tamanio,
+                cantidad=cantidad,
+                champi=champi,
+                jamon=jamon,
+                pina=pina,
+                subtotal=subtotal
+            )
+            db.session.add(newPedido)
+            db.session.commit()
+            pedidos_ids.append(newPedido.id)
+        except Exception as e:
+            db.session.rollback()
+            return jsonify({"status": False, "error": f"Error al procesar pedido: {str(e)}"}), 500
+
+    return jsonify({"status": True,"message": f"Pedidos agregados exitosamente","pedidos_ids": pedidos_ids}), 200
+
+
+@app.route('/api/getpedidos', methods=['GET'])
+def get_pedido():
+    pedidos = Pedido.query.all()
+    
+    if not pedidos: 
+        return jsonify({"status": False, "message": "No se ha encontrado ningún pedido"}), 400
+    pedidos_data = [
+        {
+            "nombre":pedido.nombre,
+            "telefono":pedido.telefono,
+            "idpediddo":pedido.idpediddo,
+            "direccion":pedido.direccion,
+            "fecha":pedido.fecha,
+            "tamanio":pedido.tamanio,
+            "cantidad":pedido.cantidad,
+            "champi":pedido.champi,
+            "jamon":pedido.jamon,
+            "pina":pedido.pina,
+            "subtotal":pedido.subtotal
+        }
+        for pedido in pedidos
+    ]
+
+    data = jsonify({"status": True, "pedidos": pedidos_data}), 201
+            
+
+    return data
+
 if __name__ == '__main__':
-    app.config.from_object(config['development'])
-    app.register_error_handler(404, pagina_no_encontrada)
-    app.run()
+    db.init_app(app)
+    with app.app_context():
+        db.create_all()
+    app.run(debug=True)
+
+
